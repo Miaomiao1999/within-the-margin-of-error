@@ -1,0 +1,324 @@
+### In Chapter 4, we used logistic regression to predict the probability of default using income and balance on the Default data set. We will now estimate the test error of this logistic regression model using the validation set approach. Do not forget to set a random seed before beginning your analysis.
+
+```{r}
+# (a) Fit a logistic regression model that uses income and balance to predict default.
+library(ISLR)
+set.seed(1)
+glm.fit = glm(default~income + balance , data = Default, family = binomial)
+summary(glm.fit)
+```
+
+```{r}
+# (b) Using the validation set approach, estimate the test error of this model. In order to do this, you must perform the following steps:
+
+# i. Split the sample set into a training set and a validation set.
+dim(Default)
+train = sample(10000, 5000)
+
+# ii. Fit a multiple logistic regression model using only the training observations.
+glm.fit1 = glm(default~income + balance , data = Default, subset = train, family = binomial)
+summary(glm.fit1)
+
+# iii. Obtain a prediction of default status for each individual in the validation set by computing the posterior probability of default for that individual, and classifying the individual to the default category if the posterior probability is greater than 0.5.
+
+glm.probs=predict(glm.fit1, Default[-train,], type="response")
+
+glm.pred=rep("No", 5000)
+glm.pred[glm.probs>.5]="Yes"
+
+# iv. Compute the validation set error, which is the fraction of the observations in the validation set that are misclassified.
+mean((glm.pred != Default[-train,]$default))
+```
+
+```{r}
+# (c) Repeat the process in (b) three times, using three different splits of the observations into a training set and a validation set. Comment on the results obtained.
+train = sample(10000, 5000)
+glm.fit2 = glm(default~income + balance , data = Default, subset = train, family = binomial)
+glm.probs=predict(glm.fit1, Default[-train,], type="response")
+glm.pred=rep("No", 5000)
+glm.pred[glm.probs>.5]="Yes"
+mean((glm.pred != Default[-train,]$default))
+```
+```{r}
+train = sample(10000, 5000)
+glm.fit3 = glm(default~income + balance , data = Default, subset = train, family = binomial)
+glm.probs=predict(glm.fit1, Default[-train,], type="response")
+glm.pred=rep("No", 5000)
+glm.pred[glm.probs>.5]="Yes"
+mean((glm.pred != Default[-train,]$default))
+```
+
+```{r}
+train = sample(10000, 5000)
+glm.fit4 = glm(default~income + balance , data = Default, subset = train, family = binomial)
+glm.probs=predict(glm.fit1, Default[-train,], type="response")
+glm.pred=rep("No", 5000)
+glm.pred[glm.probs>.5]="Yes"
+mean((glm.pred != Default[-train,]$default))
+```
+
+I began by using the sample() function to split the set of observations into two halves, by selecting a random subset of 5,000 observations out of the original 10,000 observations. I referred to these observations as the training set. Using the validation set approach, the estimated test errors of these models are not the same, since the splits of the observations into a training set and a validation set are different.
+
+```{r}
+# (d) Now consider a logistic regression model that predicts the probability of default using income, balance, and a dummy variable for student. Estimate the test error for this model using the validation set approach. Comment on whether or not including a dummy variable for student leads to a reduction in the test error rate.
+train = sample(10000, 5000)
+glm.fit5 = glm(default~income + balance + student, data = Default, subset = train, family = binomial)
+contrasts(Default$student)
+glm.probs=predict(glm.fit1, Default[-train,], type="response")
+glm.pred=rep("No", 5000)
+glm.pred[glm.probs>.5]="Yes"
+mean((glm.pred != Default[-train,]$default))
+
+```
+Including a dummy variable for student does not seem to lead to a reduction in the test error rate.
+
+
+### We continue to consider the use of a logistic regression model to predict the probability of default using income and balance on the Default data set. In particular, we will now compute estimates for the standard errors of the income and balance logistic regression coefficients in two different ways: (1) using the bootstrap, and (2) using the standard formula for computing the standard errors in the glm() function. Do not forget to set a random seed before beginning your analysis.
+
+```{r}
+# (a) Using the summary() and glm() functions, determine the esti- mated standard errors for the coefficients associated with income and balance in a multiple logistic regression model that uses both predictors.
+library(ISLR)
+set.seed(1)
+glm.fit = glm(default~income + balance , data = Default, family = binomial)
+summary(glm.fit)
+```
+The estimated standard errors for B0 is 4.348e-01, for B1 is 4.985e-06, and for B2 is 2.274e-04.
+
+```{r}
+# (b) Write a function, boot.fn(), that takes as input the Default data set as well as an index of the observations, and that outputs the coefficient estimates for income and balance in the multiple logistic regression model.
+boot.fn=function(data,index) {
+ return(coef(glm(default~income + balance ,data=data,subset=index, family = binomial)))
+}
+```
+
+```{r}
+# (c) Use the boot() function together with your boot.fn() function to estimate the standard errors of the logistic regression coefficients for income and balance.
+library(boot)
+boot(Default,boot.fn ,1000)
+```
+We use the boot() function to compute the standard errors of 1,000 bootstrap estimates for the intercept and slope terms. The estimated standard errors of B0, B1, and B2 are 4.239273e-01, 4.582525e-06, and 2.267955e-04.
+
+```{r}
+# (d) Comment on the estimated standard errors obtained using the glm() function and using your bootstrap function.
+```
+
+The estimated standard errors obtained using the glm() function and using my bootstrap function are very close.
+
+
+### We will now perform cross-validation on a simulated data set.
+```{r}
+# (a) In this data set, what is n and what is p? Write out the model used to generate the data in equation form.
+set.seed(1)
+x=rnorm(100)
+y=x-2*x^2+rnorm(100)
+```
+
+In this data set, n = 100 and p = 2. The model used to generate the data in equation form is y = x - 2*x^2 + epsilon
+
+```{r}
+# (b) Create a scatterplot of X against Y . Comment on what you find.
+plot(x,y)
+```
+
+A quadratic relationship between x and y is shown by the bell-shaped curve.
+
+```{r}
+# (c) Set a random seed, and then compute the LOOCV errors that result from fitting the following four models using least squares:
+library(boot)
+set.seed(1)
+XY<-data.frame(x,y)
+
+cv.error=rep(0,4)
+degree=1:4
+for(d in degree){
+  glm.fit=glm(y~poly(x,d), data=XY)
+  cv.error[d]=cv.glm(XY, glm.fit)$delta[1]
+}
+
+cv.error
+
+```
+The LOOCV errors that result from fitting the four models (from x of degree 1 to 4) are 7.2881616, 0.9374236, 0.9566218, and 0.9539049, respectively.
+
+
+```{r}
+# (d) Repeat (c) using another random seed, and report your results. Are your results the same as what you got in (c)? Why?
+set.seed(2)
+
+cv.error=rep(0,4)
+degree=1:4
+for(d in degree){
+  glm.fit=glm(y~poly(x,d), data=XY)
+  cv.error[d]=cv.glm(XY, glm.fit)$delta[1]
+}
+
+cv.error
+
+```
+The results are exactly the same as what I got in (c), because when LOOCV is usedd, all the possible splits of the data are used. In other words, there is no randomness in the training/validation set splits -- LOOCV evaluates n folds of a single test observation and so the same error rate estimates are obtained.
+
+```{r}
+# (e) Which of the models in (c) had the smallest LOOCV error? Is this what you expected? Explain your answer.
+
+```
+
+Models in (c)ii. had the smallest LOOCV error. That is what I expected since the true model does show a quadratic relationship between x and y. ii also shows a model for y with the polynomial of x of degree 2.
+
+```{r}
+# (f) Comment on the statistical significance of the coefficient estimates that results from fitting each of the models in (c) using least squares. Do these results agree with the conclusions drawn based on the cross-validation results?
+glm.fit.1 = glm(y ~x)
+summary(glm.fit.1)
+glm.fit.2 = glm(y ~ poly(x, 2))
+summary(glm.fit.2)
+glm.fit.3 = glm(y ~ poly(x, 3))
+summary(glm.fit.3)
+glm.fit.4 = glm(y ~ poly(x, 4))
+summary(glm.fit.4)
+```
+
+For i, the p-value for the x-coef estimate shows that the the linear term is statistically significant. For ii to iv, after we add x^2, x^3, and x^4 into the model, the p-values for the coefficient estimates show that both the linear and quadratic terms are statistically significant but the cubic and 4th degree terms are not. These results agree with the conclusions drawn based on the CV results - quadratic model is the best fit.
+
+
+### We will now consider the Boston housing data set, from the MASS library.
+```{r}
+# (a) Based on this data set, provide an estimate for the population mean of medv. Call this estimate μˆ.
+library(MASS)
+attach(Boston)
+mu.hat <- mean(medv)
+mu.hat
+```
+
+```{r}
+# (b) Provide an estimate of the standard error of μˆ. Interpret this result.
+dim(Boston)
+se.mu.hat <- sd(medv)/sqrt(506)
+se.mu.hat
+```
+
+The standard error of μˆ shows how it varies under repeated sampling. Roughly speaking, for a random sample from the population, we would expect the estimate for the population mean of medv to differ from the true population mean by approximately 0.4088611, on average.
+
+```{r}
+# (c) Now estimate the standard error of μˆ using the bootstrap. How does this compare to your answer from (b)?
+library(boot)
+set.seed(1)
+boot.fn = function(data, index) {
+    mu <- mean(data[index])
+    return (mu)
+}
+boot(medv, boot.fn, 1000)
+
+```
+The estimated standard error of μˆ using the bootstrap is  0.4119374, which is very pretty close to my answer in part (b).
+
+```{r}
+# (d) Based on your bootstrap estimate from (c), provide a 95 % confidence interval for the mean of medv. Compare it to the results obtained using t.test(Boston$medv).
+ci.mu.hat = c(22.53281 - 2*0.4119374, 22.53281 + 2*0.4119374)
+ci.mu.hat
+t.test(Boston$medv)
+```
+The confidence interval obtained from my bootstrap estimate from (c) is very much similar to the results obtained using t.test(Boston$medv).
+
+
+```{r}
+# (e) Based on this data set, provide an estimate, μˆmed, for the median value of medv in the population.
+mu.med.hat <- median(medv)
+mu.med.hat
+```
+
+```{r}
+# (f) We now would like to estimate the standard error of μˆmed. Unfortunately, there is no simple formula for computing the standard error of the median. Instead, estimate the standard error of the median using the bootstrap. Comment on your findings.
+set.seed(1)
+boot.fn = function(data, index) {
+    mu.med <- median(data[index])
+    return (mu.med)
+}
+boot(medv, boot.fn, 1000)
+
+```
+
+The estimated median using the bootstrap is 21.2, which is exactly the same as the result obtained in (e). The standard error estimated by bootstrap is 0.3801002, which is also quite small compared to 21.2.
+
+```{r}
+# (g) Based on this data set, provide an estimate for the tenth percentile of medv in Boston suburbs. Call this quantity μˆ0.1.
+mu.hat.0.1 <- quantile(medv, 0.1)
+mu.hat.0.1
+```
+
+```{r}
+# (h) Use the bootstrap to estimate the standard error of μˆ0.1. Comment on your findings.
+set.seed(1)
+boot.fn = function(data, index) {
+    mu.0.1 <- quantile(data[index], 0.1)
+    return (mu.0.1)
+}
+boot(medv, boot.fn, 1000)
+
+```
+
+The estimate for the tenth percentile of medv in Boston suburbs using the bootstrap is 12.75, which is, again, exactly the same as the result obtained in (g). The standard error estimated by bootstrap is 0.505056, which is also quite small compared to 12.75.
+
+
+### This question should be answered using the Weekly data set, which is part of the ISLR package. This data is similar in nature to the Smarket data from this chapter’s lab, except that it contains 1,089 weekly returns for 21 years, from the beginning of 1990 to the end of 2010.
+
+```{r}
+# (a) Produce some numerical and graphical summaries of the “Weekly” data. Do there appear to be any patterns?
+library(ISLR)
+names(Weekly)
+dim(Weekly)
+summary(Weekly)
+cor(Weekly[,-9])
+pairs(Weekly)
+```
+The correlations between the lag variables and today's returns are close to zero. In other words, there appears to be little correlation between today’s returns and previous days’ returns. The only substantial correlation is between Year and Volume. By plotting the data we see that Volume is increasing over time. In other words, the average number of shares traded weekly increased from 1990 to 2010.
+
+```{r}
+attach(Weekly)
+plot(Volume)
+```
+
+```{r}
+# (b) Use the full data set to perform a logistic regression with “Direction” as the response and the five lag variables plus “Volume” as predictors. Use the summary function to print the results. Do any of the predictors appear to be statistically significant? If so, which ones?
+glm.fit=glm(Direction~Lag1+Lag2+Lag3+Lag4+Lag5+Volume, data=Weekly, family=binomial)
+summary(glm.fit)
+```
+Only Lag2 appears to be statistically significant if we use a 95% confidence interval. 
+
+```{r}
+# (c) Compute the confusion matrix and overall fraction of correct predictions. Explain what the confusion matrix is telling you about the types of mistakes made by logistic regression.
+glm.probs = predict(glm.fit, type = "response")
+contrasts(Direction)
+# We know that glm.probs correspond to the probability of the market going up, rather than down, because the contrasts() function indicates that R has created a dummy variable with a 1 for "Up"
+
+glm.pred=rep("Down", 1089)
+glm.pred[glm.probs > .5] = "Up"
+table(glm.pred, Direction)
+mean(glm.pred == Direction)
+```
+The diagonal elements of the confusion matrix indicate correct predictions, while the off-diagonals represent incorrect predictions. Hence our model correctly predicted that the market would go up on 557 weeks and that it would go down on 54 weeks, for a total of 557 + 54 = 611 correct predictions. The mean() function can be used to compute the fraction of weeks for which the prediction was correct. In this case, logistic regression correctly predicted the movement of the market 56.1 % of the time.
+
+At first glance, it appears that the logistic regression model is working better than random guessing. However, this result is misleading because we trained and tested the model on the same set of 1, 089 observations. In other words, 1 − 56.1% = 43.9% is the training error rate. As we have seen previously, the training error rate is often overly optimistic—it tends to underestimate the test error rate.
+
+In terms of the different types of mistakes, of the true Down's (for the weeks when market goes down), the error rate is as high as 430/(54+430) = 88.8% (Fasle Positive Rate); of the true Up's (for the weeks when market goes up), the error rate is 48/(48+557) = 7.9% (False Negative Rate). The overall misclassification rate is 43.9%.
+
+```{r}
+# (d) Now fit the logistic regression model using a training data period from 1990 to 2008, with Lag2 as the only predictor. Compute the confusion matrix and the overall fraction of correct predictions for the held out data (that is, the data from 2009 and 2010).
+train = (Year < 2009)
+Weekly.2009.2010 = Weekly[!train,]
+dim(Weekly.2009.2010)
+Direction.2009.2010 = Direction[!train]
+
+glm.fits=glm(Direction~Lag2, data=Weekly, family=binomial, subset=train)
+summary(glm.fits)
+
+glm.probs=predict(glm.fits, Weekly.2009.2010, type="response")
+
+glm.pred=rep("Down", 104)
+glm.pred[glm.probs>.5]="Up"
+table(glm.pred, Direction.2009.2010)
+mean(glm.pred == Direction.2009.2010)
+```
+The overall fraction of correct predictions for the held out data (that is, the data from 2009 and 2010) is 62.5%. Moreover, on weeks when there is a true increase in the market, it has an error rate of 5/(5+56) = 8.2%; on weeks there is a true decrease in the market, it has an error rate of 34/(9+34) = 79.1%. The overall misclassification rate is 1 - 62.5% = 37.5%.
+
+
+
+
