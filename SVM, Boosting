@@ -1,0 +1,300 @@
+#### This problem involves the OJ data set which is part of the ISLR package.
+
+```{r}
+# (a) Create a training set containing a random sample of 800 observations, and a test set containing the remaining observations.
+
+library(ISLR)
+set.seed(2018)
+train = sample(nrow(OJ), 800)
+train.data = OJ[train,]
+test.data = OJ[-train,]
+```
+
+```{r}
+# (b) Fit a support vector classifier to the training data using cost=0.01, with Purchase as the response and the other variables as predictors. Use the summary() function to produce summary statistics, and describe the results obtained.
+
+library(e1071)
+set.seed(2018)
+svmfit=svm(Purchase~., data=train.data, kernel="linear", cost=0.01)
+summary(svmfit)
+```
+
+The summary tells us that a linear kernel was used with cost=0.01 and gamma = 0.05555556, and that there are 447 support vectors, 224 in one class (CH) and 223 in the other (MM). This makes sense because of the low cost (0.01) for violating the margin.
+
+
+```{r}
+# (c) What are the training and test error rates?
+
+pred.train=predict(svmfit,train.data)
+table(pred.train, train.data$Purchase)
+mean(pred.train!=train.data$Purchase)
+
+pred.test=predict(svmfit,test.data)
+table(pred.test, test.data$Purchase)
+mean(pred.test!=test.data$Purchase)
+```
+
+The training error rate is 16.625% and the test error rate is 16.66667%.
+
+```{r}
+# (d) Use the tune() function to select an optimal cost. Consider values in the range 0.01 to 10.
+
+set.seed(2018)
+tune.out=tune(svm, Purchase~., data=train.data, kernel="linear",
+ranges = list(cost=10^seq(-2,1, by = 0.2)))
+summary(tune.out)
+
+```
+
+An optimal cost is 3.981072.
+
+```{r}
+# (e) Compute the training and test error rates using this new value for cost.
+
+bestmod=tune.out$best.model
+
+pred.train=predict(bestmod,train.data)
+table(pred.train, train.data$Purchase)
+mean(pred.train!=train.data$Purchase)
+
+pred.test=predict(bestmod,test.data)
+table(pred.test, test.data$Purchase)
+mean(pred.test!=test.data$Purchase)
+
+```
+
+The training and test error rates using this new value for cost are 15.875% and 17.03704%, respectively.
+
+```{r}
+# (f) Repeat parts (b) through (e) using a support vector machine with a radial kernel. Use the default value for gamma.
+
+svmfit1=svm(Purchase~., data=train.data, kernel="radial", cost=0.01)
+summary(svmfit1)
+
+pred.train1=predict(svmfit1,train.data)
+table(pred.train1, train.data$Purchase)
+mean(pred.train1!=train.data$Purchase)
+
+pred.test1=predict(svmfit1,test.data)
+table(pred.test1, test.data$Purchase)
+mean(pred.test1!=test.data$Purchase)
+
+set.seed(2018)
+tune.out1=tune(svm, Purchase~., data=train.data, kernel="radial",
+ranges = list(10^seq(-2,1, by = 0.2)))
+summary(tune.out1)
+tune.out1$best.parameters
+
+bestmod1=tune.out1$best.model
+
+pred.train1=predict(bestmod1,train.data)
+table(pred.train1, train.data$Purchase)
+mean(pred.train1!=train.data$Purchase)
+
+pred.test1=predict(bestmod1,test.data)
+table(pred.test1, test.data$Purchase)
+mean(pred.test1!=test.data$Purchase)
+```
+
+The summary tells us that a radial kernel was used with cost=0.01 and default gamma = 0.05555556, and that there are 616 support vectors, 309 in one class (CH) and 307 in the other (MM). The training error rate is 38.375% and the test error rate is 40.74074%. An optimal cost is 0.01. The training and test error rates using this new value for cost are 14.25% and 17.40741%, respectively.
+
+```{r}
+# (g) Repeat parts (b) through (e) using a support vector machine with a polynomial kernel. Set degree=2.
+
+svmfit2=svm(Purchase~., data=train.data, kernel="polynomial", cost=0.01, degree = 2)
+summary(svmfit2)
+
+pred.train2=predict(svmfit2,train.data)
+table(pred.train2, train.data$Purchase)
+mean(pred.train2!=train.data$Purchase)
+
+pred.test2=predict(svmfit2,test.data)
+table(pred.test2, test.data$Purchase)
+mean(pred.test2!=test.data$Purchase)
+
+set.seed(2018)
+tune.out2=tune(svm, Purchase~., data=train.data, kernel="polynomial", degree =2,
+ranges = list(10^seq(-2,1, by = 0.2)))
+summary(tune.out2)
+
+tune.out2$best.parameters
+
+bestmod2=tune.out2$best.model
+
+pred.train2=predict(bestmod2,train.data)
+table(pred.train2, train.data$Purchase)
+mean(pred.train2!=train.data$Purchase)
+
+pred.test2=predict(bestmod2,test.data)
+table(pred.test2, test.data$Purchase)
+mean(pred.test2!=test.data$Purchase)
+
+```
+
+The summary tells us that a radial kernel was used with cost=0.01 and default gamma = 0.05555556, and that there are 620 support vectors, 313 in one class (CH) and 307 in the other (MM). The training error rate is 37.25% and the test error rate is 40%. An optimal cost is 0.01. The training and test error rates using this new value for cost are 17.75% and 21.11111%, respectively.
+
+```{r}
+# (h) Overall, which approach seems to give the best results on this data?
+```
+
+Overall, a support vector machine with a radial kernel seems to give the best resuls on this data, and a linear kernal also gives a comparably low test error rate.
+
+
+
+### We now use boosting to predict Salary in the Hitters data set.
+
+```{r}
+# (a) Remove the observations for whom the salary information is unknown, and then log-transform the salaries.
+
+library(ISLR)
+Hitters = na.omit(Hitters)
+Hitters$Salary = log(Hitters$Salary)
+```
+
+```{r}
+# (b) Create a training set consisting of the first 200 observations, and a test set consisting of the remaining observations.
+
+dim(Hitters)
+train = Hitters[1:200,]
+test = Hitters[201:263,]
+```
+
+```{r}
+# (c) Perform boosting on the training set with 1,000 trees for a range of values of the shrinkage parameter λ. Produce a plot with different shrinkage values on the x-axis and the corresponding training set MSE on the y-axis.
+
+library(gbm)
+set.seed(2018)
+p = seq(0, 1 ,length.out =1000)
+training.MSE <- rep(NA, length(p))
+for (i in 1:length(p)) {
+    boost.hitters = gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = p[i])
+    yhat.boost = predict(boost.hitters, train, n.trees = 1000)
+    training.MSE[i] = mean((yhat.boost - train$Salary)^2)
+}
+plot(p, training.MSE, xlab = "Shrinkage Values", ylab = "Training Set MSE")
+
+min(training.MSE)
+p[which.min(training.MSE)]
+```
+
+The minimum test set MSE is 0.0002502679 and the corresponding shrinkage value is 0.966967.
+
+```{r}
+# (d) Produce a plot with different shrinkage values on the x-axis and the corresponding test set MSE on the y-axis.
+
+library(gbm)
+set.seed(2018)
+p = seq(0,1,length.out = 1000)
+test.MSE <- rep(NA, length(p))
+for (i in 1:length(p)) {
+    boost.hitters = gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = p[i])
+    yhat.boost = predict(boost.hitters, newdata = test, n.trees = 1000)
+    test.MSE[i] = mean((yhat.boost - test$Salary)^2)
+}
+plot(p, test.MSE, xlab = "Shrinkage Values", ylab = "Test Set MSE")
+
+min(test.MSE)
+p[which.min(test.MSE)]
+```
+
+The minimum test set MSE is 0.2431567 and the corresponding shrinkage value is 0.1521522.
+
+```{r}
+# (e) Compare the test MSE of boosting to the test MSE that results from applying two of the regression approaches seen in Chapters 3 and 6.
+
+library(glmnet)
+lm.fit = lm(Salary ~ ., data = train)
+pred.lm = predict(lm.fit, test)
+mean((pred.lm - test$Salary)^2)
+
+x.train = model.matrix(Salary ~ ., data = train)[,-1]
+y.train = train$Salary
+x.test = model.matrix(Salary ~ ., data = test)[,-1]
+ridge.mod = glmnet(x.train, y.train, alpha = 0)
+pred.ridge = predict(ridge.mod, s = 0.01, newx = x.test)
+mean((pred.ridge - test$Salary)^2)
+
+```
+
+The test MSE for applying linear regression in Chatper 3 is 0.4917959 and that for applying ridge regression is 0.4570283. The test MSE (0.2431567) of boosting is much lower than both of the methods.
+
+```{r}
+# (f) Which variables appear to be the most important predictors in the boosted model?
+
+library(gbm)
+boost.best = gbm(Salary ~ ., data = train, distribution = "gaussian", n.trees = 1000, shrinkage = p[which.min(test.MSE)])
+summary(boost.best)
+```
+
+"CAtBat"", "CWalks", and "PutOuts" appear to the most important predictors in the boosted model, with "CRuns" and "Walks" following after.
+
+```{r}
+# (g) Now apply bagging to the training set. What is the test set MSE for this approach?
+
+library(randomForest)
+set.seed(2018)
+bag.hitters=randomForest(Salary ~ ., data = train,
+mtry=19, n.trees = 1000, importance =TRUE)
+yhat.bag = predict(bag.hitters ,newdata=test)
+mean((yhat.bag-test$Salary)^2)
+```
+
+The test set MSE for bagging is 0.2274493, a bit lower than the test set MSE 0.2431567 I got from boosting.
+
+
+### This question uses the Caravan data set.
+
+```{r}
+# (a) Create a training set consisting of the first 1,000 observations, and a test set consisting of the remaining observations.
+
+library(ISLR)
+dim(Caravan)
+Caravan$Purchase <- ifelse(Caravan$Purchase == "Yes", 1, 0)
+train = Caravan[1:1000,]
+test = Caravan[1001:5822,]
+
+```
+
+```{r}
+# (b) Fit a boosting model to the training set with Purchase as the response and the other variables as predictors. Use 1,000 trees, and a shrinkage value of 0.01. Which predictors appear to be the most important?
+
+library(gbm)
+set.seed(2018)
+boost.caravan = gbm(Purchase ~ ., data = train, distribution="bernoulli", n.trees = 1000, shrinkage = 0.01)
+summary(boost.caravan)
+```
+
+Predictors “PPERSAUT” appears to be the most important, with “MKOOPKLA” and "MOPLHOOG" following after.
+
+```{r}
+# (c) Use the boosting model to predict the response on the test data. Predict that a person will make a purchase if the estimated probability of purchase is greater than 20 %. Form a confusion matrix. What fraction of the people predicted to make a purchase do in fact make one? How does this compare with the results obtained from applying KNN or logistic regression to this data set?
+
+probs.boost = predict(boost.caravan, test, n.trees = 1000, type = "response")
+pred.boost = ifelse(probs.boost > 0.2, 1, 0)
+table(test$Purchase, pred.boost)
+
+# KNN
+library(class)
+train$Purchase <- factor(train$Purchase)
+test$Purchase <- factor(test$Purchase)
+train.def <- train$Purchase
+test.def <- test$Purchase
+
+knn.caravan = knn(train, test, train.def,k=5)
+table(knn.caravan, test.def)
+
+# Logistic Regression
+glm.caravan <- glm(Purchase ~ ., data = train, family = "binomial")
+probs.glm <- predict(glm.caravan, test, type = "response")
+pred.glm <- ifelse(probs.glm > 0.2, 1, 0)
+table(test$Purchase, pred.glm)
+
+
+```
+
+Using the boosting model, 31/ (114+31) = 21.37931034 % of the people predicted to make a purchase do in fact make one. 
+
+The result obtained from applying knn (k=5 used in this problem) is a bit better than boosting. 4/ (29+4) = 12.121212 % of the people predicted to make a purchase do in fact make one.
+
+The result obtained from applying logistic regression (threshold = 0.2 used in this problem) is worse than boosting. 58/ (350+58) = 14.21568627% of the people predicted to make a purchase do in fact make one.
+
