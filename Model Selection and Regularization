@@ -1,0 +1,164 @@
+### In the lab, a classification tree was applied to the Carseats data set after converting Sales into a qualitative response variable. Now we will seek to predict Sales using regression trees and related approaches, treating the response as a quantitative variable.
+
+```{r}
+# (a) Split the data set into a training set and a test set.
+
+library(ISLR)
+library(tree)
+attach(Carseats)
+set.seed(2)
+dim(Carseats)
+train = sample(1:nrow(Carseats), 200)
+Carseats.test = Carseats[-train,]
+```
+
+```{r}
+# (b) Fit a regression tree to the training set. Plot the tree, and interpret the results. What test MSE do you obtain?
+
+tree.carseats = tree(Sales~., Carseats, subset = train)
+summary(tree.carseats)
+plot(tree.carseats)
+text(tree.carseats, pretty = 0)
+tree.pred = predict(tree.carseats, Carseats.test)
+mean((tree.pred - Carseats.test$Sales)^2)
+```
+The output of summary() indicates that only 7 of the variables have been used in constructing the tree. The tree plot displays the splitting criterion (eg. Price < 125.5). The initial split occurs on the variable ShelveLoc, which is a factor with levels bad, medium, and good indicating the qualtiy of the shelving location for the car seats at each site. The tree indicates that the most important factors associated with sales is ShelvLoc, Price, Age, Income, CompPrice, Population, and Advertising. The best predictor to lower the RSS of the model is ShelvLoc, as we can see that the first node is the level of ShelvLoc being bad or medium, so the left branch is those with data having Bad or Medium ShelveLoc, and the right includes observations whose ShelvLoc is Good. Conditional on ShelvLoc levels, sales of which product having a price lower than 125.5 or 135 becomes important. The numbers at the bottom of the terminal branches indicate the mean of sales in each data subset. We can see that the final sales predictions are generally higher for the “Good” ShelvLoc side compared to the predictions on the “Bad/Medium” ShelvLoc side of the tree. 
+
+The test MSE I obtained is 4.844991.
+
+```{r}
+# (c) Use cross-validation in order to determine the optimal level of tree complexity. Does pruning the tree improve the test MSE?
+
+set.seed(2)
+cv.carseats = cv.tree(tree.carseats)
+plot(cv.carseats$size, cv.carseats$dev, type = 'b')
+
+cv.carseats$size[which.min(cv.carseats$dev)]
+prune.carseats = prune.tree(tree.carseats, best = 13)
+plot(prune.carseats)
+text(prune.carseats, pretty = 0)
+prune.pred = predict(prune.carseats, Carseats.test)
+mean((prune.pred - Carseats.test$Sales)^2)
+
+```
+
+The optimal level of tree complexity is when the size of tree is 13. However, the test MSE goes up to 4.906326, a tiny increase than before, so pruning the tree does not improve test MSE.
+
+```{r}
+# (d) Use the bagging approach in order to analyze this data. What test MSE do you obtain? Use the importance() function to determine which variables are most important.
+
+library(randomForest)
+set.seed(2)
+bag.carseats = randomForest(Sales~., data = Carseats, subset = train, mtry = 10, importance = TRUE)
+bag.carseats
+
+bag.pred = predict(bag.carseats, Carseats.test)
+mean((bag.pred - Carseats.test$Sales)^2)
+
+importance(bag.carseats)
+```
+
+The test MSE I obtained is 2.391774, less than half of the test MSE obtained using an optimally-pruned tree. The two most important variables are Price and ShelveLoc, with CompPrice following as the third important one.
+
+
+```{r}
+# (e) Use random forests to analyze this data. What test MSE do you obtain? Use the importance() function to determine which variables are most important. Describe the effect of m, the number of variables considered at each split, on the error rate obtained.
+
+set.seed(2)
+rf.carseats = randomForest(Sales~., data = Carseats, subset = train, importance = TRUE)
+rf.pred = predict(rf.carseats, Carseats.test)
+mean((rf.pred - Carseats.test$Sales)^2)
+
+importance(rf.carseats)
+```
+
+By default, randomForest() uses p/3 variables when building a random forest of regression trees. In this case, mtry = 3, and the test MSE I obtained is 2.922475, which is higher than when mtry = 10 (bagging). Still, the two most important variables are ShelveLoc and Price, with CompPrice following as the third important one.
+
+
+```{r}
+set.seed(2)
+rf.carseats = randomForest(Sales~., data = Carseats, subset = train, mtry = 5, importance = TRUE)
+rf.pred = predict(rf.carseats, Carseats.test)
+mean((rf.pred - Carseats.test$Sales)^2)
+
+```
+
+When m = 5, the test MSE decreases compared to when m = 3, but still not better than the bagging approach when m = 10.
+
+```{r}
+set.seed(2)
+test.err=double(10)
+for(mtry in 1:10){
+  fit = randomForest(Sales~.,data = Carseats,subset=train,mtry= mtry)
+  pred=predict(fit,Carseats.test)
+  test.err[mtry]=with(Carseats.test,mean((Carseats.test$Sales - pred)^2))
+  cat(mtry," ")
+}
+matplot(1:mtry,test.err,pch=19,type="b",ylab="Mean Squared Error")
+
+```
+
+In conclusion, as the number of variables considered at each split m increases, the error rate obtained decreases in general.
+
+
+###. In this exercise, we will predict the number of applications received using the other variables in the College data set.
+
+```{r}
+# (a) Split the data set into a training set and a test set.
+library(ISLR)
+
+set.seed(1)
+train = sample(c(TRUE, FALSE), nrow(College), rep = TRUE)
+test = (!train)
+```
+
+```{r}
+# (b) Fit a linear model using least squares on the training set, and report the test error obtained.
+
+lm.fit = lm(Apps ~., College[train,])
+pred = predict(lm.fit, College[test,])
+mean((pred - College[test,]$Apps)^2)
+```
+
+The test MSE is 1520331.
+
+```{r}
+# (c) Fit a ridge regression model on the training set, with λ chosen by cross-validation. Report the test error obtained.
+
+library(glmnet)
+x = model.matrix(Apps~., College)[,-1]
+y = College$Apps
+grid = 10^seq(10, -2, length = 100)
+ridge.mod = glmnet(x[train,], y[train], alpha = 0, lambda = grid, thresh = 1e-12)
+
+set.seed(1)
+cv.out = cv.glmnet(x[train,], y[train], alpha = 0, lambda = grid, thresh = 1e-12)
+bestlam = cv.out$lambda.min
+bestlam
+
+ridge.pred=predict(ridge.mod,s=bestlam ,newx=x[test,])
+mean((ridge.pred - y[test])^2)
+
+```
+The test MSE obtained is 1684247, which is higher than the error for using least squares.
+
+
+```{r}
+# (d) Fit a lasso model on the training set, with λ chosen by cross validation. Report the test error obtained, along with the number of non-zero coefficient estimates.
+
+lasso.mod=glmnet(x[train,],y[train],alpha=1, lambda = grid, thresh = 1e-12)
+
+cv.out_1=cv.glmnet(x[train,],y[train],alpha=1, lambda = grid, thresh = 1e-12)
+bestlam_1=cv.out_1$lambda.min
+bestlam_1
+
+lasso.pred=predict(lasso.mod,s=bestlam_1 ,newx=x[test,])
+mean((lasso.pred-y[test])^2)
+
+lasso.coef=predict(lasso.mod,type="coefficients",s=bestlam_1)[1:18,]
+lasso.coef
+length(lasso.coef[lasso.coef!=0])
+```
+The test MSE obtained is 1615301, which is lower than the error for ridge regression, but still higher than that from using least squares. 3 of the coefficient estimates are exactly zero. So the lasso model with λ chosen by cross-validation contains only 15 non-zero coefficient estimates.
+
+
