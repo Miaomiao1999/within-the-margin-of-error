@@ -1,0 +1,31 @@
+## Consider the “USArrests” data. We will now perform hierarchical clustering on the states.
+
+### (a) Using hierarchical clustering with complete linkage and Euclidean distance, cluster the states.
+```{r}
+data("USArrests")
+set.seed(123)
+hc.complete <- hclust(dist(USArrests), method = "complete")
+plot(hc.complete)
+```
+
+### (b) Cut the dendrogram at a height that results in three distinct clusters. Which states belong to which clusters?
+```{r}
+cutree(hc.complete, 3)
+```
+
+### (c) Hierarchically cluster the states using complete linkage and Euclidean distance, after scaling the variables to have standard deviation one.
+```{r}
+xsc <- scale(USArrests)
+hc.complete.sc <- hclust(dist(xsc), method = "complete")
+plot(hc.complete.sc, main="Hierarchical
+Clustering with Scaled Features ")
+```
+
+### (d) What effect does scaling the variables have on the hierarchical clustering obtained? In your opinion, should the variables be scaled before the inter-observation dissimilarities are computed? Provide a justification for your answer.
+```{r}
+cutree(hc.complete.sc, 3)
+
+table(cutree(hc.complete, 3), cutree(hc.complete.sc, 3))
+```
+
+Scaling the variables has some effect on the hierarchical clustering obtained, even though the results still share some similarities. We want to scale the variables to have standard deviation one because they are measured on different units; otherwise, the choice of units (e.g. murder/assault/rape are all measured in a scale of per 100,000 and UrbanPop are measured in percent urban population) for a particular variable will greatly affect the dissimilarity measure obtained. 
