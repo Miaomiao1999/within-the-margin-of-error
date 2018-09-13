@@ -1,0 +1,226 @@
+import pandas as pd
+import numpy as np
+
+dataTrain = pd.DataFrame(pd.read_csv('training.csv'))
+dataTest = pd.DataFrame(pd.read_csv('test.csv'))
+In [78]:
+data_train = np.array(dataTrain)
+data_test = np.array(dataTest)
+In [79]:
+y_train = data_train[:,12]
+In [80]:
+x_train = data_train[:,2:12]
+x_train = np.append(x_train, data_train[:,0].reshape(-1,1),1)
+x_test = data_test[:,2:]
+x_test = np.append(x_test, data_test[:,0].reshape(-1,1),1)
+x = np.append(x_test,x_train,0)
+In [81]:
+query_quantity = np.zeros(17039).astype(int)
+for i in range(x.shape[0]):
+    k = x[i,10].astype(int)
+    query_quantity[k] = query_quantity[k] + 1
+
+temp_column = np.zeros(x.shape[0])
+for i in range(x.shape[0]):
+    k = x[i,10].astype(int)
+    temp_column[i] = query_quantity[k]
+    
+    
+In [82]:
+x = np.append(x[:,:10],temp_column.reshape(-1,1),1)
+In [83]:
+for i in range(4,8):
+    temp = x[:,i].astype(int)
+    for j in range(x.shape[0]):
+            if(x[j,i]!=0):
+                 x[j,i] = np.log(temp[j])
+In [84]:
+xTest = x[:30001,:]
+xTrain = x[30001:,:]
+In [85]:
+#Scaler
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler
+
+scaler_std = StandardScaler()
+scaler_mm = MinMaxScaler()
+
+x_std = scaler_std.fit_transform(x)
+x_mm = scaler_std.fit_transform(x)
+In [86]:
+xTest_std = x_std[:30001,:]
+xTrain_std = x_std[30001:,:]
+xTest_mm = x_mm[:30001,:]
+xTrain_mm = x_mm[30001:,:]
+In [87]:
+from xgboost import XGBClassifier
+import xgboost as xgb
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import StratifiedKFold
+kfold = StratifiedKFold(n_splits=5)
+In [88]:
+x_Val = xTrain[:16000,:]
+x_Train = xTrain[16000:,:]
+y_Val = y_train[:16000]
+y_Train = y_train[16000:]
+In [89]:
+x_Train.shape
+Out[89]:
+(64046, 11)
+In [93]:
+from sklearn.model_selection import train_test_split
+#xTrain, xVal, yTrain, yVal = train_test_split(x_std, y_train, test_size = 0.15)
+#xTrain = x_train[:68000,:]
+#yTrain = y_train[:68000]
+#xVal = x_train[68000:,:]
+#yVal = y_train[68000:]
+dtrain = xgb.DMatrix(x_Train, y_Train)
+X_train_temp, X_val_temp, y_train_temp, y_val_temp = train_test_split(x_Train, y_Train, test_size=0.25)
+#X_train_temp = xTrain[:58000,:]
+#y_train_temp = yTrain[:58000]
+#X_val_temp = xTrain[58000:,:]
+#y_val_temp = yTrain[58000:]
+xgb1 = XGBClassifier(
+        learning_rate =0.01,
+        n_estimators=10000, 
+        max_depth=7,
+        min_child_weight=4,
+        gamma=0,
+        subsample=0.3,
+        colsample_bytree=0.6,
+        colsample_bylevel=0.4,
+        objective= 'binary:logistic',
+        seed=3)
+
+cvresult = xgb.cv(xgb1.get_xgb_params(), dtrain, num_boost_round=xgb1.get_params()['n_estimators'],
+              folds = kfold.split(x_Train,y_Train), metrics='error', early_stopping_rounds=500,stratified =True)
+  
+cvresult.to_csv('1_nestimators_1.csv', index_label = 'n_estimators')
+n_estimators = cvresult.shape[0]
+xgb1.set_params(n_estimators = n_estimators)
+Out[93]:
+XGBClassifier(base_score=0.5, colsample_bylevel=0.4, colsample_bytree=0.6,
+       gamma=0, learning_rate=0.01, max_delta_step=0, max_depth=7,
+       min_child_weight=4, missing=None, n_estimators=721, nthread=-1,
+       objective='binary:logistic', reg_alpha=0, reg_lambda=1,
+       scale_pos_weight=1, seed=3, silent=True, subsample=0.3)
+In [94]:
+xgb1.fit(X_train_temp, y_train_temp, eval_set=[(X_val_temp, y_val_temp)], eval_metric ='error',early_stopping_rounds=500,  verbose =True)
+
+from sklearn.metrics import zero_one_loss
+pred_xgb = xgb1.predict(x_Val)
+zero_one_loss(y_Val,pred_xgb)
+Out[95]:
+0.32718749999999996
+In [96]:
+max_depth = range(5,10,1)
+min_child_weight = range(2,7,1)
+param_test2_1 = dict(max_depth=max_depth, min_child_weight=min_child_weight)
+param_test2_1
+Out[96]:
+{'max_depth': [5, 6, 7, 8, 9], 'min_child_weight': [2, 3, 4, 5, 6]}
+In [98]:
+xgb2 = XGBClassifier(
+        learning_rate =0.01,
+        n_estimators=721, 
+        max_depth=7,
+        min_child_weight=4,
+        gamma=0,
+        subsample=0.3,
+        colsample_bytree=0.6,
+        colsample_bylevel=0.4,
+        objective= 'binary:logistic',
+        seed=3)
+
+gsearch2_1 = GridSearchCV(xgb2, param_grid = param_test2_1, scoring= 'accuracy',n_jobs=-1)
+gsearch2_1.fit(x_Train, y_Train)
+gsearch2_1.grid_scores_, gsearch2_1.best_params_,     gsearch2_1.best_score_
+
+([mean: 0.66410, std: 0.00396, params: {'max_depth': 5, 'min_child_weight': 2},
+  mean: 0.66416, std: 0.00383, params: {'max_depth': 5, 'min_child_weight': 3},
+  mean: 0.66393, std: 0.00446, params: {'max_depth': 5, 'min_child_weight': 4},
+  mean: 0.66388, std: 0.00460, params: {'max_depth': 5, 'min_child_weight': 5},
+  mean: 0.66388, std: 0.00420, params: {'max_depth': 5, 'min_child_weight': 6},
+  mean: 0.66527, std: 0.00439, params: {'max_depth': 6, 'min_child_weight': 2},
+  mean: 0.66527, std: 0.00426, params: {'max_depth': 6, 'min_child_weight': 3},
+  mean: 0.66518, std: 0.00403, params: {'max_depth': 6, 'min_child_weight': 4},
+  mean: 0.66516, std: 0.00438, params: {'max_depth': 6, 'min_child_weight': 5},
+  mean: 0.66574, std: 0.00437, params: {'max_depth': 6, 'min_child_weight': 6},
+  mean: 0.66483, std: 0.00372, params: {'max_depth': 7, 'min_child_weight': 2},
+  mean: 0.66493, std: 0.00420, params: {'max_depth': 7, 'min_child_weight': 3},
+  mean: 0.66476, std: 0.00363, params: {'max_depth': 7, 'min_child_weight': 4},
+  mean: 0.66499, std: 0.00397, params: {'max_depth': 7, 'min_child_weight': 5},
+  mean: 0.66543, std: 0.00352, params: {'max_depth': 7, 'min_child_weight': 6},
+  mean: 0.66427, std: 0.00326, params: {'max_depth': 8, 'min_child_weight': 2},
+  mean: 0.66410, std: 0.00389, params: {'max_depth': 8, 'min_child_weight': 3},
+  mean: 0.66468, std: 0.00378, params: {'max_depth': 8, 'min_child_weight': 4},
+  mean: 0.66493, std: 0.00420, params: {'max_depth': 8, 'min_child_weight': 5},
+  mean: 0.66519, std: 0.00409, params: {'max_depth': 8, 'min_child_weight': 6},
+  mean: 0.66357, std: 0.00320, params: {'max_depth': 9, 'min_child_weight': 2},
+  mean: 0.66390, std: 0.00349, params: {'max_depth': 9, 'min_child_weight': 3},
+  mean: 0.66452, std: 0.00339, params: {'max_depth': 9, 'min_child_weight': 4},
+  mean: 0.66421, std: 0.00404, params: {'max_depth': 9, 'min_child_weight': 5},
+  mean: 0.66302, std: 0.00519, params: {'max_depth': 9, 'min_child_weight': 6}],
+ {'max_depth': 6, 'min_child_weight': 6},
+ 0.66574024919589048)
+In [99]:
+xgb2.set_params(max_depth= 6 , min_child_weight=6)
+xgb2.fit(X_train_temp, y_train_temp, eval_set=[(X_val_temp, y_val_temp)], eval_metric = 'error', early_stopping_rounds=500,  verbose =True)
+
+XGBClassifier(base_score=0.5, colsample_bylevel=0.4, colsample_bytree=0.6,
+       gamma=0, learning_rate=0.01, max_delta_step=0, max_depth=6,
+       min_child_weight=6, missing=None, n_estimators=721, nthread=-1,
+       objective='binary:logistic', reg_alpha=0, reg_lambda=1,
+       scale_pos_weight=1, seed=3, silent=True, subsample=0.3)
+In [100]:
+pred_xgb = xgb2.predict(x_Val)
+zero_one_loss(y_Val,pred_xgb)
+Out[100]:
+0.32468750000000002
+In [101]:
+subsample = [i/10.0 for i in range(2,9)]
+colsample_bytree = [i/10.0 for i in range(3,10)]
+param_test3_1 = dict(subsample=subsample, colsample_bytree=colsample_bytree)
+param_test3_1
+Out[101]:
+{'colsample_bytree': [0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+ 'subsample': [0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]}
+In [103]:
+xgb3 = XGBClassifier(
+        learning_rate =0.01,
+        n_estimators=721, 
+        max_depth=6,
+        min_child_weight=6,
+        gamma=0,
+        subsample=0.3,
+        colsample_bytree=0.6,
+        colsample_bylevel=0.4,
+        objective= 'binary:logistic',
+        seed=3)
+
+gsearch3_1 = GridSearchCV(xgb3, param_grid = param_test3_1, scoring= 'accuracy',n_jobs = -1)
+gsearch3_1.fit(x_Train, y_Train)
+gsearch3_1.grid_scores_, gsearch3_1.best_params_,     gsearch3_1.best_score_
+
+In[104]:
+xgb3.set_params(subsample=0.7 , colsample_bytree=0.9)
+xgb3.fit(X_train_temp, y_train_temp, eval_set=[(X_val_temp, y_val_temp)], eval_metric = 'error', early_stopping_rounds=500,  verbose =True)
+
+Out[104]:
+XGBClassifier(base_score=0.5, colsample_bylevel=0.4, colsample_bytree=0.9,
+       gamma=0, learning_rate=0.01, max_delta_step=0, max_depth=6,
+       min_child_weight=6, missing=None, n_estimators=721, nthread=-1,
+       objective='binary:logistic', reg_alpha=0, reg_lambda=1,
+       scale_pos_weight=1, seed=3, silent=True, subsample=0.7)
+In [105]:
+pred_xgb = xgb3.predict(x_Val)
+zero_one_loss(y_Val,pred_xgb)
+Out[105]:
+0.325125
+In [106]:
+pred = xgb3.predict(xTest)
+In [109]:
+result = pd.DataFrame(pred)
+dataX = pd.DataFrame(x)
+result.to_csv("result.csv")
+dataX.to_csv("x.csv")
